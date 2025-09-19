@@ -1,0 +1,49 @@
+// copia y pega esto en la consola del navegador
+(function() {
+  const MODEL_MAP = { g: "GEMINI", c: "CHATGPT", d: "DEEPSEEK" };
+  window.enviarMensaje = function(prompt = "", imageUrl = "", ...models) {
+    // Si no se pasan modelos, preguntar a los 3 (pero lo hace enviando 3 peticiones separadas)
+    const requested = (models && models.length) ? models.map(m => m.toLowerCase()) : ["g","c","d"];
+    const uniq = Array.from(new Set(requested));
+
+    uniq.forEach(code => {
+      if (!["g","c","d"].includes(code)) {
+        console.warn("Modelo inválido (usar 'g','c' o 'd'):", code);
+        return;
+      }
+      const body = {
+        prompt: prompt || "", // si se envía vacío, el servidor aplicará 'Can you solve this?'
+        image_url: imageUrl || "",
+        model: code
+      };
+      const name = MODEL_MAP[code] || code;
+      console.log(`→ Enviando a ${name}...`);
+      fetch("http://localhost:4000/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      .then(async (resp) => {
+        const text = await resp.text();
+        // tratamos de parsear JSON, si no, mostramos texto crudo
+        try {
+          const json = JSON.parse(text);
+          console.groupCollapsed(`${name} respondió (status ${resp.status})`);
+          console.log(json.text);
+          console.groupEnd();
+        } catch (e) {
+          console.groupCollapsed(`${name} respondió (no JSON) status ${resp.status}`);
+          console.log(text);
+          console.groupEnd();
+        }
+      })
+      .catch(err => {
+        console.error(`${name} -> error de fetch:`, err);
+      });
+    });
+  };
+  console.log("Función enviarMensaje registrada. Ejemplos:");
+  console.log('enviarMensaje("Explícame esto", "https://.../img.jpg", "g","c","d")');
+  console.log('enviarMensaje("", "https://.../img.jpg", "g","c") // usa prompt por defecto en el servidor');
+  console.log('enviarMensaje("", "https://.../img.jpg", "g") // usa un solo modelo');
+})();
